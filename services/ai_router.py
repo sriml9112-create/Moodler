@@ -15,6 +15,25 @@ from services.task_detector import TaskDetector
 from utils.validation import looks_like_api_key, looks_like_gemini_api_key
 
 LOGGER = logging.getLogger(__name__)
+HARD_TASK_TYPES = {"multiple_choice", "calculation", "accounting"}
+HARD_TEXT_KEYWORDS = (
+    "buchungssatz",
+    "soll",
+    "haben",
+    "skonto",
+    "rabatt",
+    "kalkulation",
+    "bezugskalkulation",
+    "absatzkalkulation",
+    "maengelruege",
+    "mängelrüge",
+    "mahnung",
+    "verzug",
+    "kaufvertrag",
+    "prozent",
+    "%",
+    "gleichung",
+)
 
 
 class AIProviderRouter:
@@ -51,6 +70,14 @@ class AIProviderRouter:
     def judge_results(self, results: list[TaskResult], source: str) -> TaskResult:
         return self._judge(results, source)
 
+    def should_prefer_provider_compare_for_text(self, text: str, forced_mode: str = "auto") -> bool:
+        if self.settings.ai_provider == "compare":
+            return True
+        return self._can_compare() and self._looks_hard_text(text, forced_mode)
+
+    def should_route_screenshot_once_for_hard_compare(self) -> bool:
+        return self._can_compare() and self.settings.ai_provider != "compare"
+
     def has_usable_key(self) -> bool:
         provider = self.settings.ai_provider
         if provider == "openai":
@@ -71,11 +98,22 @@ class AIProviderRouter:
         provider = self.settings.ai_provider
         if provider == "compare":
             return self._compare(input_text, image_path, forced_mode, source)
+        if source == "text" and self._can_compare() and self._looks_hard_text(input_text, forced_mode):
+            return self._compare_with_reason(
+                input_text,
+                image_path,
+                forced_mode,
+                source,
+                "Schwierige Aufgabe vorab erkannt.",
+            )
         if provider == "gemini":
-            return self._call_provider("gemini", input_text, image_path, forced_mode)
+            result = self._call_provider("gemini", input_text, image_path, forced_mode)
+            return self._maybe_compare_after_primary(result, input_text, image_path, forced_mode, source)
         if provider == "auto":
-            return self._auto(input_text, image_path, forced_mode)
-        return self._call_provider("openai", input_text, image_path, forced_mode)
+            result = self._auto(input_text, image_path, forced_mode)
+            return self._maybe_compare_after_primary(result, input_text, image_path, forced_mode, source)
+        result = self._call_provider("openai", input_text, image_path, forced_mode)
+        return self._maybe_compare_after_primary(result, input_text, image_path, forced_mode, source)
 
     def _auto(self, input_text: str, image_path: Path | None, forced_mode: str) -> TaskResult:
         ordered = self._auto_order()
@@ -136,6 +174,50 @@ class AIProviderRouter:
             return winner
         return self._judge(results, source)
 
+    def _compare_with_reason(
+        self,
+        input_text: str,
+        image_path: Path | None,
+        forced_mode: str,
+        source: str,
+        reason: str,
+    ) -> TaskResult:
+        result = self._compare(input_text, image_path, forced_mode, source)
+        notice = f"Schwierige Aufgabe: OpenAI und Gemini verglichen. {reason}"
+        if notice not in result.warnings:
+            result.warnings.append(notice)
+        return result
+
+    def _maybe_compare_after_primary(
+        self,
+        primary: TaskResult,
+        input_text: str,
+        image_path: Path | None,
+        forced_mode: str,
+        source: str,
+    ) -> TaskResult:
+        if not self._can_compare() or primary.provider == "compare":
+            return primary
+        if not self._result_needs_provider_compare(primary):
+            return primary
+        primary_provider = primary.provider if primary.provider in {"openai", "gemini"} else self._primary_provider_name()
+        other_provider = "gemini" if primary_provider == "openai" else "openai"
+        if not self._provider_has_key(other_provider):
+            return primary
+        results = [primary]
+        try:
+            other = self._call_provider(other_provider, input_text, image_path, forced_mode)
+            other.warnings.append(f"Anbieter: {self._provider_label(other_provider)}")
+            results.append(other)
+        except Exception as exc:
+            LOGGER.warning("%s failed in hard-task provider compare", other_provider, exc_info=True)
+            results.append(TaskResult.error(f"{self._provider_label(other_provider)} Fehler: {exc}", source=source))
+        judged = self._judge(results, source)
+        notice = "Schwierige Aufgabe: OpenAI und Gemini verglichen. Verifier entscheidet fachlich."
+        if notice not in judged.warnings:
+            judged.warnings.append(notice)
+        return judged
+
     def _judge(self, results: list[TaskResult], source: str) -> TaskResult:
         valid_results = [result for result in results if result.short_answer != "Fehler"]
         if not valid_results:
@@ -180,6 +262,36 @@ class AIProviderRouter:
 
     def _provider_has_key(self, provider: str) -> bool:
         return self._has_openai_key() if provider == "openai" else self._has_gemini_key()
+
+    def _can_compare(self) -> bool:
+        return self._has_openai_key() and self._has_gemini_key()
+
+    def _primary_provider_name(self) -> str:
+        if self.settings.ai_provider in {"openai", "gemini"}:
+            return self.settings.ai_provider
+        return "openai" if self._has_openai_key() else "gemini"
+
+    def _looks_hard_text(self, text: str, forced_mode: str = "auto") -> bool:
+        if forced_mode in HARD_TASK_TYPES:
+            return True
+        value = (text or "").lower()
+        detected = self.detector.quick_detect(text or "")
+        if detected in HARD_TASK_TYPES:
+            return True
+        return any(keyword in value for keyword in HARD_TEXT_KEYWORDS)
+
+    @staticmethod
+    def _result_needs_provider_compare(result: TaskResult) -> bool:
+        if result.short_answer == "Fehler":
+            return False
+        if result.task_type in HARD_TASK_TYPES:
+            return True
+        answer = (result.short_answer or "").strip().lower()
+        if answer == "unsicher" or result.task_type == "incomplete_task":
+            return True
+        if result.confidence and result.confidence < 0.75 and result.task_type not in {"no_task"}:
+            return True
+        return any("unsicher" in warning.lower() or "unklar" in warning.lower() for warning in result.warnings)
 
     def _has_openai_key(self) -> bool:
         return looks_like_api_key(self.settings.openai_api_key or self.settings.api_key)

@@ -19,9 +19,13 @@ class AgentService:
         self.ai_service = ai_service
 
     def analyze_text(self, text: str, forced_mode: str, agent_count: int) -> TaskResult:
+        if self._provider_compare_preferred_for_text(text, forced_mode):
+            return self._analyze_with_retry(lambda: self.ai_service.analyze_text(text, forced_mode), "text")
         return self._analyze_with_retry(lambda: self._analyze_once_text(text, forced_mode, agent_count), "text")
 
     def analyze_image(self, image_path: Path, forced_mode: str, agent_count: int) -> TaskResult:
+        if self._provider_compare_preferred_for_screenshot():
+            return self._analyze_with_retry(lambda: self.ai_service.analyze_image(image_path, forced_mode), "screenshot")
         return self._analyze_with_retry(lambda: self._analyze_once_image(image_path, forced_mode, agent_count), "screenshot")
 
     def _analyze_once_text(self, text: str, forced_mode: str, agent_count: int) -> TaskResult:
@@ -116,3 +120,23 @@ class AgentService:
             answer = attempt.short_answer or attempt.full_answer
             lines.append(f"Versuch {index}: {answer} ({attempt.confidence_percent}%)")
         return "\n".join(lines)
+
+    def _provider_compare_preferred_for_text(self, text: str, forced_mode: str) -> bool:
+        checker = getattr(self.ai_service, "should_prefer_provider_compare_for_text", None)
+        if not callable(checker):
+            return False
+        try:
+            return bool(checker(text, forced_mode))
+        except Exception:
+            LOGGER.debug("Hard-task provider-compare check failed", exc_info=True)
+            return False
+
+    def _provider_compare_preferred_for_screenshot(self) -> bool:
+        checker = getattr(self.ai_service, "should_route_screenshot_once_for_hard_compare", None)
+        if not callable(checker):
+            return False
+        try:
+            return bool(checker())
+        except Exception:
+            LOGGER.debug("Screenshot provider-compare check failed", exc_info=True)
+            return False

@@ -266,7 +266,8 @@ class ControlCenter:
             "Mehr Agenten kosten mehr Zeit und API-Geld.\n"
             "Verifier ist immer aktiv.\n"
             "Keine Entscheidung nach Mehrheit.\n"
-            "Mathe/BW werden fachlich geprüft.",
+            "Mathe/BW werden fachlich geprüft.\n"
+            "Schwierige Aufgaben nutzen automatisch OpenAI + Gemini, wenn beide Keys vorhanden sind.",
             height=10,
         ).pack(fill="both", expand=True, padx=16, pady=8)
         self._button(tab, "Agenten speichern", self._save_agents).pack(anchor="w", padx=16, pady=12)

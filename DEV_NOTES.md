@@ -78,6 +78,7 @@
 - Provider modes are `openai`, `gemini`, `auto`, and `compare`.
 - Auto mode falls back silently to the other configured provider and stores the notice in warnings/details.
 - Compare mode asks both providers where keys are available and verifies fachlich, not by majority.
+- Hard tasks auto-escalate to OpenAI + Gemini when both keys exist: MC, calculation, accounting/BW and uncertain screenshot results.
 - Mathe-MC judge instructions require calculation/einsetzen instead of majority voting.
 - BW/RW judge instructions require fachliche/logische Pruefung before comparing agents.
 - Agent/Judge fallback marks divergent answers as `unsicher` instead of choosing a majority.

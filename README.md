@@ -130,6 +130,8 @@ Der BW/HAK-Fokus ist intern immer aktiv und nicht als extra Tab sichtbar. Priori
 
 Mehrere Agenten sind nur Vergleichswerkzeuge. Moodler soll nicht per Mehrheit entscheiden. Der Verifier prüft fachlich: MC-Optionen einzeln, Mathe durch Einsetzen/Rechnen, BW/RW logisch und rechtlich/fachlich. Wenn keine Lösung sicher passt, zeigt die Bar `unsicher`.
 
+Wenn OpenAI- und Gemini-Key vorhanden sind, nutzt Moodler bei schwierigeren Aufgaben automatisch beide Anbieter: MC, Rechnungen, Prozentrechnung, Skonto/Rabatt, Kalkulation, BW/RW, Buchungssätze und unsichere Screenshots werden verglichen. Der Verifier entscheidet fachlich, nicht nach Mehrheit.
+
 ## Schreibstil
 
 Bei Briefen, E-Mails, Texten und Zusammenfassungen verlangt der Prompt kurze, natürliche Texte auf HAK-Schülerniveau: sauber, aber nicht künstlich perfekt; höflich bei Firma/Professor, sonst direkt.

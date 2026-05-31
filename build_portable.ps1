@@ -8,6 +8,9 @@ if (-not (Test-Path $AppDir)) {
 
 Copy-Item -LiteralPath (Join-Path $Root "README.md") -Destination (Join-Path $AppDir "README.md") -Force
 Copy-Item -LiteralPath (Join-Path $Root ".env.example") -Destination (Join-Path $AppDir ".env.example") -Force
+Copy-Item -LiteralPath (Join-Path $Root "START_HIER.bat") -Destination (Join-Path $AppDir "START_HIER.bat") -Force
+Copy-Item -LiteralPath (Join-Path $Root "create_shortcut.bat") -Destination (Join-Path $AppDir "create_shortcut.bat") -Force
+Copy-Item -LiteralPath (Join-Path $Root "create_shortcut.ps1") -Destination (Join-Path $AppDir "create_shortcut.ps1") -Force
 if (Test-Path (Join-Path $Root "RELEASE_CHECKLIST.md")) {
     Copy-Item -LiteralPath (Join-Path $Root "RELEASE_CHECKLIST.md") -Destination (Join-Path $AppDir "RELEASE_CHECKLIST.md") -Force
 }

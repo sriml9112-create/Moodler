@@ -94,14 +94,73 @@ class MoodlerApp:
         if self.busy:
             return
         self._set_busy(True, "Bereich waehlen...")
+        if self.settings.screenshot_method == "windows":
+            self._start_system_snipping(fallback_to_selector=True)
+            return
+        show_outline = self.settings.screenshot_method != "experimental"
+        self._start_area_selector(show_outline=show_outline, fallback_to_snipping=True)
+
+    def _start_system_snipping(self, fallback_to_selector: bool) -> None:
+        LOGGER.info("selector started")
+        baseline_signature = self.screenshot_service.clipboard_image_signature()
+        if not self.screenshot_service.launch_system_snipping():
+            LOGGER.info("selector fallback used")
+            if fallback_to_selector:
+                self._start_area_selector(show_outline=True, fallback_to_snipping=False)
+            else:
+                self._set_busy(False, "Error")
+                self.current_result = TaskResult.error("Screenshot-Auswahl konnte nicht gestartet werden.", source="screenshot")
+            return
+        thread = threading.Thread(target=self._clipboard_capture_worker, args=(baseline_signature,), daemon=True)
+        thread.start()
+
+    def _start_area_selector(self, show_outline: bool = True, fallback_to_snipping: bool = False) -> None:
         try:
-            self.active_selector = ScreenAreaSelector(self.toolbar.root, self._on_selection_complete)
+            self.active_selector = ScreenAreaSelector(
+                self.toolbar.root,
+                self._on_selection_complete,
+                show_outline=show_outline,
+            )
         except Exception as exc:
             LOGGER.exception("Screenshot selector failed")
+            if fallback_to_snipping:
+                LOGGER.info("selector fallback used")
+                self._start_system_snipping(fallback_to_selector=False)
+                return
             self._set_busy(False, "Error")
             self.current_result = TaskResult.error(f"Screenshot-Auswahl konnte nicht gestartet werden: {exc}", source="screenshot")
             if not self.settings.suppress_task_popups:
                 self.open_details()
+
+    def _clipboard_capture_worker(self, baseline_signature: str) -> None:
+        try:
+            LOGGER.info("capture started clipboard")
+            result = self.screenshot_service.wait_for_clipboard_image(
+                baseline_signature,
+                timeout_seconds=20,
+                poll_interval=0.15,
+                cancel_check=self.screenshot_service.screenclip_cancel_requested,
+            )
+            if result == "cancelled":
+                LOGGER.info("selector cancelled")
+                self._post_ui(lambda: self._clipboard_capture_timeout())
+                return
+            if result is None:
+                LOGGER.info("selector timeout")
+                self._post_ui(lambda: self._clipboard_capture_timeout())
+                return
+            path, width, height = result
+            LOGGER.info("capture finished %s", path)
+            self._post_ui(lambda: self._capture_done(path, width, height))
+        except Exception as exc:
+            LOGGER.exception("Clipboard screenshot failed")
+            self._post_ui(lambda exc=exc: self._capture_failed(exc))
+
+    def _clipboard_capture_timeout(self) -> None:
+        self.current_screenshot = None
+        self.current_screenshot_size = None
+        self.current_source = "unknown"
+        self._set_busy(False, "Ready")
 
     def _on_selection_complete(self, coords: tuple[int, int, int, int] | None) -> None:
         self.active_selector = None

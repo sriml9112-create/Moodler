@@ -51,21 +51,23 @@
 - Token and cost metadata is stored per history row; dashboard totals are local estimates.
 - Live provider balance is not claimed because neither desktop provider API exposes a simple universal balance endpoint here.
 - SEB support is detection-only: Moodler checks running process names for status display, but does not bypass, hide from, alter, or weaken Safe Exam Browser restrictions.
+- `build_app.bat` closes a running `Moodler.exe` before rebuilding because Windows locks files in `dist\Moodler`.
+- Portable ZIP includes `START_HIER.bat` and shortcut scripts next to `Moodler.exe`; no `.env`, DB, logs or caches are packaged.
 
 ## Screenshot Selector
 
-- [x] Uses the old stable Moodler principle: fullscreen `tk.Toplevel`, `alpha=0.01`, black background, `Canvas`.
-- [x] Uses normal Tk bindings: `<ButtonPress-1>`, `<B1-Motion>`, `<ButtonRelease-1>`, `<Escape>`.
-- [x] No low-level Windows mouse hook.
-- [x] No input polling loop.
+- [x] Default screenshot method is `Gabll-Modus empfohlen`: old Moodler/Gabll flow, click camera, drag area, release, then send.
+- [x] Default method uses the internal Tk selector, not Windows Snipping.
+- [x] Windows Snipping (`ms-screenclip`) remains only as a fallback/option.
+- [x] Selector is normal Tk only: `tk.Toplevel` sized to the virtual screen plus minimal neutral alpha/outline.
+- [x] Gabll default does not use color-key transparency because it can break mouse hit-testing on some Windows setups.
+- [x] Selector binds normal Tk events on both Canvas and Toplevel: `<ButtonPress-1>`, `<B1-Motion>`, `<ButtonRelease-1>`, `<Escape>`.
+- [x] Mouse movement only updates internal coordinates and never cancels the selection.
 - [x] No `grab_set`, `wait_window`, or `wait_variable`.
+- [x] No low-level Windows mouse hook remains in `ui/selector.py`.
 - [x] No green selection rectangle.
-- [x] No drawn selection frame, border, text, or marker.
-- [x] The nearly transparent Canvas catches drag events, preventing browser text selection.
-- [x] Coordinates are calculated from `event.x_root`/`event.y_root` and converted with current DPI scale.
-- [x] On release the selector calls `withdraw()`, waits 150 ms, destroys itself, then hands coords back.
 - [x] Screenshot capture still runs afterward in a worker thread.
-- [x] `Esc`, right-click, and small selections cancel and return the toolbar to `Ready`.
+- [x] `Esc`, right-click, timeout and small selections cancel and return the toolbar to `Ready`.
 
 ## Prompt Notes
 
@@ -85,4 +87,5 @@
 - Agent/Judge fallback marks divergent answers as `unsicher` instead of choosing a majority.
 - Uncertainty retry runs at most three analysis attempts; after that unresolved tasks stay `unsicher`.
 - Model fallback order is `gpt-4.1 -> gpt-4o -> gpt-4o-mini`.
-- Gemini model fallback order is `gemini-2.5-flash -> gemini-2.0-flash`.
+- OpenAI pricing/config was checked against the official pricing page on 2026-05-31 for `gpt-5.5`, `gpt-5.4`, `gpt-4.1`, `gpt-4o` and mini variants.
+- Gemini 2.0 Flash is deprecated by Google and scheduled for shutdown on 2026-06-01; visible Gemini fallback is now `gemini-2.5-flash -> gemini-2.5-flash-lite`.

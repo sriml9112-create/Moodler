@@ -42,6 +42,7 @@ class AppSettings:
     enable_learning_guardrails: bool = True
     bw_focus_enabled: bool = True
     suppress_task_popups: bool = True
+    screenshot_method: str = "gabll"
     preferred_subjects: list[str] | None = None
     cost_budget_usd: float = 0.0
     toolbar_x: int = 5
@@ -93,6 +94,10 @@ class AppSettings:
         settings.enable_learning_guardrails = True
         settings.bw_focus_enabled = True
         settings.suppress_task_popups = True
+        if settings.screenshot_method == "stable":
+            settings.screenshot_method = "gabll"
+        if settings.screenshot_method not in {"gabll", "windows", "experimental"}:
+            settings.screenshot_method = "gabll"
         settings.preferred_subjects = list(BW_FOCUS_SUBJECTS)
         settings.cost_budget_usd = cls._safe_money(settings.cost_budget_usd)
         settings.toolbar_x = cls._safe_position_value(settings.toolbar_x)

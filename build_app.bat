@@ -22,7 +22,14 @@ echo Installing requirements...
 %PYTHON_CMD% -m pip install -r requirements.txt
 if errorlevel 1 exit /b 1
 
+echo Closing running Moodler.exe if needed...
+powershell -NoProfile -Command "Get-Process Moodler -ErrorAction SilentlyContinue | Stop-Process -Force"
+
 if exist "dist\Moodler" rmdir /S /Q "dist\Moodler"
+if exist "dist\Moodler" (
+  echo dist\Moodler konnte nicht geloescht werden. Bitte laufende Moodler-Fenster schliessen und erneut versuchen.
+  exit /b 1
+)
 
 echo Building Moodler.exe...
 %PYTHON_CMD% -m PyInstaller --noconfirm --clean --windowed --name Moodler --hidden-import google.genai --distpath dist --workpath build --specpath build main.py

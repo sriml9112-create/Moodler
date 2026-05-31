@@ -65,7 +65,9 @@ Die Bar zeigt nur kurze Antworten: MC-Buchstaben, `richtig/falsch`, `Lücken kop
 
 ## Screenshot
 
-Kamera klicken, Bereich ziehen, loslassen. Der Selector nutzt wieder das alte stabile Moodler-Prinzip: ein fast unsichtbares Vollbild-Fenster (`alpha=0.01`) mit Canvas, normalen Maus-Bindings und ohne gezeichneten Rahmen. Es gibt keine grüne Markierung, keine Texte und keine Browser-Textmarkierung. `Esc`, Rechtsklick oder eine zu kleine Auswahl brechen ab. Danach kann sofort wieder ein Screenshot gestartet werden.
+Standard ist `Gabll-Modus empfohlen`: Kamera klicken, Bereich ziehen, loslassen, Screenshot ist geladen, dann Pfeil/Send drücken. Der Selector ist wieder eine einfache Tkinter-Auswahl wie beim alten Moodler/Gabll: minimale neutrale Alpha-Fläche, dünner neutraler Rahmen, kein Low-Level-Mouse-Hook, kein `grab_set`, kein `wait_window`, kein `wait_variable`, kein blockierender UI-Thread. Mausbewegung bricht nie ab; nur `Esc`, Rechtsklick, Timeout nach 20 Sekunden oder eine zu kleine Auswahl brechen ab.
+
+Im Control Center > Automatik gibt es außerdem `Windows Snipping` als Fallback/Option und `Experimentell unsichtbar` ohne sichtbaren Rahmen. Standard bleibt Gabll.
 
 ## Control Center
 
@@ -105,9 +107,13 @@ Im Dashboard kannst du ein Startbudget setzen und die lokalen Kostenzähler zur�
 
 ## Modelle und Fallbacks
 
+Die Modellliste ist lokal in `config.py` gepflegt. Nicht freigegebene oder abgeschaltete Modelle führen nicht zum Crash; Moodler versucht automatisch den nächsten Fallback.
+
 OpenAI:
 
 - `gpt-5.5` falls verfügbar
+- `gpt-5.4` falls verfügbar
+- `gpt-5.4-mini` falls verfügbar
 - `gpt-5.2` falls verfügbar
 - `gpt-4.1`
 - `gpt-4o`
@@ -123,13 +129,13 @@ Gemini:
 - `gemini-2.5-pro`
 - `gemini-2.5-flash`
 - `gemini-2.5-flash-lite` falls verfügbar
-- `gemini-2.0-flash`
-- `gemini-2.0-flash-lite` falls verfügbar
+- `gemini-2.0-flash` nur Legacy, laut Google ab 2026-06-01 abgeschaltet
+- `gemini-2.0-flash-lite` nur Legacy
 
-Gemini-Fallback: `gemini-2.5-flash` -> `gemini-2.0-flash`
+Gemini-Fallback: `gemini-2.5-flash` -> `gemini-2.5-flash-lite`
 
-Wenn ein Modell nicht verfügbar ist, bleibt Moodler bedienbar und schreibt den Fallback-Hinweis in Details und Verlauf.
-Für Gemini-3-Preview setzt Moodler die lokale Kostenschätzung auf 0, solange kein belastbarer offizieller Preis in der Config hinterlegt ist.
+Wenn ein Modell nicht verfügbar ist, bleibt Moodler bedienbar und schreibt den Fallback-Hinweis in Details und Verlauf. Die lokale Kostenschätzung nutzt Preise aus `config.py`; Live-Balance vom Anbieter wird nicht behauptet.
+Für Preview-Modelle ohne belastbaren lokalen Preis setzt Moodler die Kostenschätzung auf 0, bis die Config aktualisiert wird.
 
 ## BW/HAK-Fokus
 
@@ -170,6 +176,7 @@ dist\Moodler-portable.zip
 ```
 
 Die ZIP enthält keine `.env`, keine lokalen Datenbanken, keine Logs, keine `__pycache__`-Ordner und keine Build-Arbeitsdateien.
+In der ZIP kannst du direkt `Moodler.exe` oder `START_HIER.bat` starten. `create_shortcut.bat` erstellt eine Desktop-Verknüpfung aus dem entpackten Ordner.
 
 EXE bauen:
 

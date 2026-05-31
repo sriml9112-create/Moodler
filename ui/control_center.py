@@ -27,6 +27,12 @@ from models.task_result import TaskResult
 from services.history_service import HistoryService
 from utils.validation import looks_like_api_key, looks_like_gemini_api_key
 
+SCREENSHOT_METHOD_LABELS = {
+    "gabll": "Gabll-Modus empfohlen",
+    "windows": "Windows Snipping",
+    "experimental": "Experimentell unsichtbar",
+}
+
 
 class ControlCenter:
     def __init__(
@@ -208,7 +214,7 @@ class ControlCenter:
         self._heading(tab, "Modelle", "OpenAI- und Gemini-Modelle getrennt auswählen. Ungültige Modelle crashen nicht.")
         tk.Label(
             tab,
-            text="Alltag: gpt-4.1 | Vision: gpt-4o | Gemini Standard: gemini-2.5-flash | Preview-Modelle nur falls verfügbar",
+            text="Alltag: gpt-4.1 | Vision: gpt-4o | Qualität: gpt-5.5 falls verfügbar | Gemini Standard: gemini-2.5-flash",
             bg=UI["panel"],
             fg=UI["warning"],
             font=("Arial", 9, "bold"),
@@ -282,15 +288,25 @@ class ControlCenter:
         self.open_details_var = tk.BooleanVar(value=self.settings.open_details_for_long)
         self.language_var = tk.StringVar(value=self.settings.language)
         self.timeout_var = tk.IntVar(value=self.settings.timeout_seconds)
+        self.screenshot_method_var = tk.StringVar(
+            value=SCREENSHOT_METHOD_LABELS.get(self.settings.screenshot_method, SCREENSHOT_METHOD_LABELS["gabll"])
+        )
 
         form = tk.Frame(tab, bg=UI["panel"])
         form.pack(fill="x", padx=16, pady=12)
+        self._option(form, "Screenshot-Methode", self.screenshot_method_var, list(SCREENSHOT_METHOD_LABELS.values()))
         self._check(form, "Aufgaben automatisch erkennen", self.auto_detect_var)
         self._check(form, "Lange Antworten automatisch kopieren", self.auto_copy_var)
         self._check(form, "Verlauf automatisch speichern", self.auto_history_var)
         self._check(form, "Detailfenster automatisch öffnen", self.open_details_var)
         self._option(form, "Sprache", self.language_var, ["auto", "de", "en"])
         self._option(form, "Timeout", self.timeout_var, [15, 30, 60])
+        self._text(
+            tab,
+            "Gabll-Modus ist Standard: Screenshot-Button, Bereich ziehen, loslassen, dann Send. "
+            "Windows Snipping bleibt nur als Fallback/Option. Experimentell nutzt denselben Selector ohne sichtbaren Rahmen.",
+            height=4,
+        ).pack(fill="x", padx=16, pady=(0, 8))
         self._button(tab, "Automatik speichern", self._save_settings).pack(anchor="w", padx=16, pady=12)
 
     def _build_history_tab(self) -> None:
@@ -478,6 +494,7 @@ class ControlCenter:
             self.settings.auto_copy_long_results = bool(self.auto_copy_var.get())
             self.settings.open_details_for_long = bool(self.open_details_var.get())
             self.settings.auto_save_history = bool(self.auto_history_var.get())
+            self.settings.screenshot_method = self._screenshot_method_value(self.screenshot_method_var.get())
         if hasattr(self, "agent_count_var"):
             self.settings.agent_count = int(self.agent_count_var.get())
         if hasattr(self, "budget_var"):
@@ -492,6 +509,18 @@ class ControlCenter:
         self._refresh_api_status()
         self._refresh_model_chip()
         self._status("Gespeichert.")
+
+    @staticmethod
+    def _screenshot_method_value(label_or_value: str) -> str:
+        value = (label_or_value or "").strip()
+        if value in SCREENSHOT_METHOD_LABELS:
+            return value
+        for key, label in SCREENSHOT_METHOD_LABELS.items():
+            if value == label:
+                return key
+        if value == "stable":
+            return "gabll"
+        return "gabll"
 
     def _save_budget(self) -> None:
         self.settings.cost_budget_usd = self._parse_money(self.budget_var.get())
@@ -533,7 +562,7 @@ class ControlCenter:
         self._refresh_model_chip()
 
     def _visible_models(self) -> list[str]:
-        visible = ["gpt-5.5", "gpt-5.2", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "gpt-4.1-mini"]
+        visible = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.2", "gpt-4.1", "gpt-4o", "gpt-4o-mini", "gpt-4.1-mini"]
         return [model for model in visible if model in OPENAI_MODELS]
 
     def _visible_gemini_models(self) -> list[str]:
@@ -543,8 +572,6 @@ class ControlCenter:
             "gemini-2.5-pro",
             "gemini-2.5-flash",
             "gemini-2.5-flash-lite",
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-lite",
         ]
         return [model for model in visible if model in GEMINI_MODELS]
 
@@ -557,7 +584,8 @@ class ControlCenter:
             lines.append(f"{model}\n{MODEL_DESCRIPTIONS.get(model, 'keine Beschreibung')}")
         lines.append("\nOpenAI-Fallback automatisch: " + " -> ".join(MODEL_FALLBACKS))
         lines.append("Gemini-Fallback automatisch: " + " -> ".join(GEMINI_MODEL_FALLBACKS))
-        lines.append("gpt-5.5 wird nur genutzt, wenn es in deiner Config/API verfügbar ist; sonst nimmt Moodler automatisch einen Fallback.")
+        lines.append("Preview- oder neue Modelle werden nur genutzt, wenn der Anbieter sie für deinen Account freigibt; sonst nimmt Moodler automatisch einen Fallback.")
+        lines.append("Gemini 2.0 ist laut Google ab 2026-06-01 abgeschaltet und wird nicht mehr als sichtbarer Standard-Fallback empfohlen.")
         return "\n\n".join(lines)
 
     def _run_dashboard_diagnostics(self) -> None:

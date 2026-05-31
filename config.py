@@ -23,6 +23,8 @@ if DEFAULT_AI_PROVIDER not in AI_PROVIDERS:
 _ENV_OPENAI_MODEL = os.getenv("OPENAI_MODEL") or os.getenv("MOODLER_MODEL", "gpt-4.1")
 OPENAI_MODELS = [
     "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.4-mini",
     "gpt-5.2",
     "gpt-4.1",
     "gpt-4o",
@@ -46,13 +48,16 @@ GEMINI_MODELS = [
 ]
 _ENV_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 DEFAULT_GEMINI_MODEL = _ENV_GEMINI_MODEL if _ENV_GEMINI_MODEL in GEMINI_MODELS else "gemini-2.5-flash"
-GEMINI_MODEL_FALLBACKS = ["gemini-2.5-flash", "gemini-2.0-flash"]
+GEMINI_MODEL_FALLBACKS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
 
-# Local cost estimates in USD per 1M text tokens. These values are kept in
-# config so they can be adjusted when provider pricing changes.
+# Local cost estimates in USD per 1M text tokens. Checked against provider
+# pricing pages on 2026-05-31 where available. Keep these values editable:
+# provider pricing changes more often than app releases.
 MODEL_PRICING_USD_PER_1M = {
     "openai": {
         "gpt-5.5": {"input": 5.00, "output": 30.00},
+        "gpt-5.4": {"input": 2.50, "output": 15.00},
+        "gpt-5.4-mini": {"input": 0.75, "output": 4.50},
         "gpt-5.2": {"input": 1.75, "output": 14.00},
         "gpt-4.1": {"input": 2.00, "output": 8.00},
         "gpt-4o": {"input": 2.50, "output": 10.00},
@@ -62,7 +67,7 @@ MODEL_PRICING_USD_PER_1M = {
     "gemini": {
         "gemini-3-pro-preview": {"input": 0.00, "output": 0.00},
         "gemini-3-flash-preview": {"input": 0.00, "output": 0.00},
-        "gemini-2.5-pro": {"input": 2.25, "output": 18.00},
+        "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
         "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
         "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
         "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
@@ -72,7 +77,9 @@ MODEL_PRICING_USD_PER_1M = {
 
 MODEL_DESCRIPTIONS = {
     "gpt-5.5": "beste Qualitaet, falls im Account verfuegbar",
-    "gpt-5.2": "beste Qualitaet, langsamer und teurer",
+    "gpt-5.4": "sehr hohe Qualitaet, falls im Account verfuegbar",
+    "gpt-5.4-mini": "schnelleres GPT-5-Modell, falls verfuegbar",
+    "gpt-5.2": "aelteres GPT-5-Modell, falls im Account noch verfuegbar",
     "gpt-4.1": "sehr gut fuer Text und Logik",
     "gpt-4.1-mini": "schnell und guenstig, guter Standard",
     "gpt-4o": "gut fuer Bilder und schnelle Analyse",
@@ -82,8 +89,8 @@ MODEL_DESCRIPTIONS = {
     "gemini-2.5-pro": "Gemini: sehr gute Qualitaet, langsamer/teurer",
     "gemini-2.5-flash": "Gemini: schneller Alltag, guter Standard",
     "gemini-2.5-flash-lite": "Gemini: sehr schnell/guenstig, falls verfuegbar",
-    "gemini-2.0-flash": "Gemini: schnelle Fallback-Analyse; laut Google ab 2026-06-01 abgeschaltet",
-    "gemini-2.0-flash-lite": "Gemini: leichter schneller Fallback; laut Google ab 2026-06-01 abgeschaltet",
+    "gemini-2.0-flash": "Gemini: Legacy-Modell; laut Google ab 2026-06-01 abgeschaltet",
+    "gemini-2.0-flash-lite": "Gemini: Legacy-Modell; laut Google ab 2026-06-01 abgeschaltet",
 }
 
 TASK_TYPES = [

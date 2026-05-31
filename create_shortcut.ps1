@@ -1,5 +1,7 @@
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Exe = Join-Path $Root "dist\Moodler\Moodler.exe"
+$LocalExe = Join-Path $Root "Moodler.exe"
+$BuiltExe = Join-Path $Root "dist\Moodler\Moodler.exe"
+$Exe = if (Test-Path $LocalExe) { $LocalExe } else { $BuiltExe }
 $Desktop = [Environment]::GetFolderPath("Desktop")
 $ShortcutPath = Join-Path $Desktop "Moodler.lnk"
 

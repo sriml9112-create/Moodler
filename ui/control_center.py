@@ -107,6 +107,7 @@ class ControlCenter:
                 "Letzte Kosten",
                 "Gesamtkosten",
                 "Restbudget",
+                "Kopierter Wert",
                 "Copy-Status",
             ]
         ):
@@ -314,16 +315,17 @@ class ControlCenter:
 
         self.history_tree = ttk.Treeview(
             tab,
-            columns=("date", "type", "short", "confidence", "provider", "model", "mode", "tokens", "cost", "fb", "fav"),
+            columns=("date", "type", "short", "copied", "confidence", "provider", "model", "mode", "tokens", "cost", "fb", "fav"),
             show="headings",
         )
         for col, label, width in [
-            ("date", "Datum", 120),
-            ("type", "Typ", 92),
-            ("short", "Kurzantwort", 210),
+            ("date", "Datum", 110),
+            ("type", "Typ", 86),
+            ("short", "Kurzantwort", 170),
+            ("copied", "Kopiert", 120),
             ("confidence", "Conf.", 52),
             ("provider", "Provider", 66),
-            ("model", "Modell", 105),
+            ("model", "Modell", 96),
             ("mode", "Modus", 60),
             ("tokens", "Tokens", 62),
             ("cost", "Kosten", 72),
@@ -404,6 +406,7 @@ class ControlCenter:
             "Letzte Kosten": self._format_money(float(last_cost.get("estimated_cost_usd") or 0)),
             "Gesamtkosten": self._format_money(total_cost),
             "Restbudget": self._format_money(remaining) if budget else "kein Budget",
+            "Kopierter Wert": str(state.get("last_copied_value", "") or last_cost.get("copied_value") or "-"),
             "Copy-Status": str(state.get("copy_status", "-")),
         }
         for key, value in values.items():
@@ -418,7 +421,16 @@ class ControlCenter:
         rows = self.history_service.list_history("favorites" if only_favorites else "all")
         self.history_rows = []
         for result in rows:
-            haystack = " ".join([result.task_type, result.subject, result.detected_task, result.short_answer, result.full_answer]).lower()
+            haystack = " ".join(
+                [
+                    result.task_type,
+                    result.subject,
+                    result.detected_task,
+                    result.short_answer,
+                    result.full_answer,
+                    result.copied_value,
+                ]
+            ).lower()
             if query and query not in haystack:
                 continue
             if task_filter != "all" and result.task_type != task_filter:
@@ -435,6 +447,7 @@ class ControlCenter:
                     result.created_at or "",
                     result.task_type,
                     (result.short_answer or result.full_answer)[:100],
+                    result.copied_value[:80],
                     f"{result.confidence_percent}%",
                     result.provider,
                     result.model,
@@ -592,7 +605,7 @@ class ControlCenter:
     def _history_copy(self) -> None:
         result = self._selected_history()
         if result is not None:
-            self.on_copy_text(result.full_answer or result.short_answer)
+            self.on_copy_text(result.copied_value or result.full_answer or result.short_answer)
 
     def _history_delete(self) -> None:
         result = self._selected_history()
@@ -612,7 +625,8 @@ class ControlCenter:
             self.refresh_history()
 
     def _copy_last_answer(self) -> None:
-        text = str(self.get_overview_state().get("last_answer_text", ""))
+        state = self.get_overview_state()
+        text = str(state.get("last_copied_value") or state.get("last_answer_text", ""))
         if text:
             self.on_copy_text(text)
             self._status("Letzte Antwort kopiert.")

@@ -32,7 +32,7 @@ class UsageEstimate:
 
 def estimate_cost_usd(provider: str, model: str, input_tokens: int, output_tokens: int) -> float:
     table = MODEL_PRICING_USD_PER_1M.get(provider, {})
-    price = table.get(model)
+    price = table.get(model) or _alias_price(table, model)
     if not price:
         return 0.0
     input_cost = max(0, int(input_tokens)) * float(price["input"]) / 1_000_000
@@ -85,6 +85,14 @@ def build_usage_estimate(
         estimated_cost_usd=estimate_cost_usd(provider, model, input_tokens, output_tokens),
         fallback_used=fallback_used,
     )
+
+
+def _alias_price(table: dict[str, dict[str, float]], model: str) -> dict[str, float] | None:
+    value = model or ""
+    for known_model, price in table.items():
+        if value == known_model or value.startswith(f"{known_model}-"):
+            return price
+    return None
 
 
 def _first_int(obj: Any, *names: str) -> int:

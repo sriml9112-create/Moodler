@@ -46,6 +46,7 @@ class TaskResult:
     estimated_cost_usd: float = 0.0
     provider_mode: str = ""
     fallback_used: bool = False
+    copied_value: str = ""
     id: int | None = None
     created_at: str | None = None
     favorite: bool = False
@@ -91,6 +92,7 @@ class TaskResult:
             flashcards=cards,
             source=source,
             raw_response=raw_response,
+            copied_value=str(data.get("copied_value", "")).strip(),
         )
 
     @classmethod
@@ -128,6 +130,7 @@ class TaskResult:
             "estimated_cost_usd": self.estimated_cost_usd,
             "provider_mode": self.provider_mode,
             "fallback_used": self.fallback_used,
+            "copied_value": self.copied_value,
         }
 
     @property

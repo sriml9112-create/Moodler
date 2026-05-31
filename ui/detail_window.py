@@ -83,6 +83,8 @@ class DetailWindow:
             parts.append(f"Erkannte Aufgabe:\n{self.result.detected_task}")
         if self.result.short_answer:
             parts.append(f"Kurzantwort:\n{self.result.short_answer}")
+        if self.result.copied_value:
+            parts.append(f"Kopierter Wert:\n{self.result.copied_value}")
         if self.result.full_answer:
             parts.append(f"Vollstaendige Antwort:\n{self.result.full_answer}")
         if self.result.explanation:

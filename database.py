@@ -55,6 +55,7 @@ class Database:
                     estimated_cost_usd REAL NOT NULL DEFAULT 0,
                     provider_mode TEXT NOT NULL DEFAULT '',
                     fallback_used INTEGER NOT NULL DEFAULT 0,
+                    copied_value TEXT NOT NULL DEFAULT '',
                     favorite INTEGER NOT NULL DEFAULT 0,
                     marked_wrong INTEGER NOT NULL DEFAULT 0
                 )
@@ -101,8 +102,8 @@ class Database:
                     short_answer, full_answer, confidence, explanation,
                     warnings, source, provider, model, input_tokens, output_tokens,
                     total_tokens, estimated_cost_usd, provider_mode, fallback_used,
-                    favorite, marked_wrong
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    copied_value, favorite, marked_wrong
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     now,
@@ -124,6 +125,7 @@ class Database:
                     float(result.estimated_cost_usd),
                     result.provider_mode,
                     int(result.fallback_used),
+                    result.copied_value,
                     int(result.favorite),
                     int(result.marked_wrong),
                 ),
@@ -205,7 +207,7 @@ class Database:
             last = conn.execute(
                 """
                 SELECT provider, model, input_tokens, output_tokens, total_tokens,
-                       estimated_cost_usd, provider_mode, fallback_used
+                       estimated_cost_usd, provider_mode, fallback_used, copied_value
                 FROM history
                 ORDER BY datetime(created_at) DESC
                 LIMIT 1
@@ -290,6 +292,7 @@ class Database:
             estimated_cost_usd=float(row["estimated_cost_usd"] or 0),
             provider_mode=row["provider_mode"] or "",
             fallback_used=bool(row["fallback_used"]),
+            copied_value=row["copied_value"] or "",
             id=int(row["id"]),
             created_at=row["created_at"],
             favorite=bool(row["favorite"]),
@@ -309,6 +312,7 @@ class Database:
             "estimated_cost_usd": "REAL NOT NULL DEFAULT 0",
             "provider_mode": "TEXT NOT NULL DEFAULT ''",
             "fallback_used": "INTEGER NOT NULL DEFAULT 0",
+            "copied_value": "TEXT NOT NULL DEFAULT ''",
         }
         for name, definition in columns.items():
             if name not in existing:

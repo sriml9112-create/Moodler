@@ -65,7 +65,7 @@ Die Bar zeigt nur kurze Antworten: MC-Buchstaben, `richtig/falsch`, `Lücken kop
 
 ## Screenshot
 
-Kamera klicken, Bereich ziehen, loslassen. Der Bildschirm bleibt normal: kein Overlay, kein Rahmen, keine Texte und keine sichtbare Browser-Textmarkierung. `Esc`, Rechtsklick oder 20 Sekunden ohne Auswahl brechen ab. Danach kann sofort wieder ein Screenshot gestartet werden.
+Kamera klicken, Bereich ziehen, loslassen. Der Selector nutzt wieder das alte stabile Moodler-Prinzip: ein fast unsichtbares Vollbild-Fenster (`alpha=0.01`) mit Canvas, normalen Maus-Bindings und ohne gezeichneten Rahmen. Es gibt keine grüne Markierung, keine Texte und keine Browser-Textmarkierung. `Esc`, Rechtsklick oder eine zu kleine Auswahl brechen ab. Danach kann sofort wieder ein Screenshot gestartet werden.
 
 ## Control Center
 
@@ -81,6 +81,7 @@ Das Zahnrad öffnet genau acht Bereiche:
 8. Export
 
 Dashboard zeigt API-Status, Provider, Modell, Agenten, letzte Aufgabe, Copy-Status, letzte Kosten, Gesamtkosten und Restbudget. Live-Balance vom Anbieter wird nicht behauptet; Kosten sind lokal geschätzt.
+Zusätzlich siehst du den zuletzt kopierten Wert, z. B. ein Rechenergebnis oder einen Buchungssatz.
 
 ## Kosten und Budget
 
@@ -91,6 +92,7 @@ Moodler speichert pro Verlaufseintrag:
 - geschätzte Kosten
 - Provider-Modus (`openai`, `gemini`, `auto`, `compare`)
 - ob ein Fallback genutzt wurde
+- den automatisch kopierten Wert
 
 Im Dashboard kannst du ein Startbudget setzen und die lokalen Kostenzähler zurücksetzen. Die Preise liegen in `config.py` und können bei geänderten Anbieterpreisen angepasst werden.
 
@@ -140,6 +142,10 @@ Wenn Auto-Copy aktiv ist, kopiert Moodler Vollantworten direkt in die Zwischenab
 
 Die Haupt-Bar bleibt kurz: `Brief kopiert`, `E-Mail kopiert`, `Lücken kopiert`, `Übersetzung kopiert` oder `Text kopiert`.
 
+Bei Rechnungen, Prozentrechnung, Skonto/Rabatt, Kalkulationen und BW/RW kopiert Moodler nur das finale Ergebnis, z. B. `2.152,14 €`. Bei Buchungssätzen wird der ganze Buchungssatz kopiert. Die Bar zeigt dafür `Ergebnis kopiert` oder `Buchung kopiert`; der Rechenweg bleibt in Details und Verlauf.
+
+Bei Briefen und E-Mails liest Moodler Empfänger, Ansprechpartner, Betreff, Nummern, Datum, Frist, Ware, Menge, Mangel/Grund und gewünschte Handlung aus der Aufgabe. Fehlende Daten werden nicht erfunden; wenn kein Name vorhanden ist, nutzt Moodler `Sehr geehrte Damen und Herren`.
+
 ## App weitergeben
 
 Portable ZIP bauen:
@@ -180,6 +186,8 @@ Für ein Release geeignet:
 4. In der Release-Beschreibung kurz schreiben: ZIP entpacken, `Moodler.exe` starten, API-Key im Zahnrad eintragen.
 
 `.gitignore` ist dafür vorbereitet.
+
+Optional kann später eine einfache Download-Seite, z. B. auf Vercel, auf das GitHub-Release verlinken. API-Keys gehören dabei niemals ins Frontend; sie bleiben lokal in Moodler bzw. in `.env`.
 
 ## Troubleshooting
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from config import BW_FOCUS_SUBJECTS, BW_FOCUS_TOPICS, JSON_SCHEMA_HINT
 from models.app_settings import AppSettings
@@ -22,6 +23,52 @@ def bw_context_text() -> str:
         "nicht per Mehrheit. HAK-BW-Themen: "
         f"{topics}."
     )
+
+
+def communication_context_text(text: str) -> str:
+    value = text.strip()
+    hints = _extract_communication_hints(value) if value else {}
+    lines = [
+        "Brief/E-Mail-Daten erkennen:",
+        "- Empfaenger/Firma, Ansprechpartner/Name, Betreff, Bestell-/Auftrags-/Rechnungsnummer, Datum, Frist, Produkt/Ware, Menge, Mangel/Grund, gewuenschte Handlung, Ton und Sprache aus der Aufgabe lesen.",
+        "- Fehlende Infos nicht erfinden.",
+        "- Wenn kein Name/Ansprechpartner vorhanden ist: 'Sehr geehrte Damen und Herren'.",
+        "- Fehlende Daten/Nummern neutral weglassen oder nur sinnvolle Platzhalter verwenden, wenn die Aufgabe das verlangt.",
+    ]
+    if hints:
+        lines.append("Lokal erkannte Texthinweise:")
+        lines.extend(f"- {key}: {value}" for key, value in hints.items())
+    return "\n".join(lines)
+
+
+def _extract_communication_hints(text: str) -> dict[str, str]:
+    hints: dict[str, str] = {}
+    patterns = {
+        "Nummer": r"\b(?:bestellnummer|auftragsnummer|rechnungsnummer|kundennummer|nr\.?)\s*[:#]?\s*([A-Z0-9][A-Z0-9\-\/]{2,})",
+        "Datum": r"\b(\d{1,2}\.\d{1,2}\.\d{2,4})\b",
+        "Frist": r"\b(?:frist|bis spaetestens|bis|zahlbar bis)\s*:?\s*(\d{1,2}\.\d{1,2}\.\d{2,4}|\d+\s*(?:tage|wochen))",
+        "Menge": r"\b(\d+(?:,\d+)?\s*(?:stk\.?|stueck|stück|kg|g|l|meter|m|packungen?))\b",
+        "Produkt/Ware": r"\b(?:ware|produkt|artikel|lieferung)\s*:?\s*([^\n.;]{2,80})",
+        "Mangel/Grund": r"\b(?:mangel|defekt|beschaedigt|beschädigt|falsch geliefert|zu spaet|zu spät|reklamation|maengelruege|mängelrüge)\b[^.\n]*",
+        "Gewuenschte Handlung": r"\b(?:ersatzlieferung|preisnachlass|reparatur|nachbesserung|storno|rueckerstattung|rückerstattung|zahlung|lieferung|mahnung)\b[^.\n]*",
+    }
+    for key, pattern in patterns.items():
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            hints[key] = match.group(1 if match.lastindex else 0).strip()
+
+    company = re.search(r"\b(?:firma|an|empfaenger|empfänger)\s*:?\s*([A-ZÄÖÜ][^\n,;]{2,60})", text, re.IGNORECASE)
+    if company:
+        hints["Empfaenger/Firma"] = company.group(1).strip()
+
+    person = re.search(r"\b(?:herr|frau)\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]+", text)
+    if person:
+        hints["Ansprechpartner"] = person.group(0).strip()
+
+    subject = re.search(r"\b(?:betreff|subject)\s*:?\s*([^\n]{3,80})", text, re.IGNORECASE)
+    if subject:
+        hints["Betreff"] = subject.group(1).strip()
+    return hints
 
 
 def build_task_prompt(
@@ -50,6 +97,7 @@ Gewuenschter Modus: {mode_line}
 Bevorzugte Spracheinstellung: {settings.language}
 Bevorzugte Faecher des Nutzers: {preferred_subjects_text(settings)}
 {bw_context_text()}
+{communication_context_text(text if source_type == "text" else "")}
 {exam_note}
 
 Erkenne einen dieser task_type-Werte:
@@ -63,11 +111,12 @@ Antwortlogik:
 - true_false: short_answer nur "richtig" oder "falsch".
 - gap_text: short_answer "Luecken ergaenzt", full_answer mit ausgefuelltem Text und Alternativen bei Unsicherheit.
 - letter/email/generic_text/grammar: kopierbereiten Text in full_answer.
+- letter/email: fehlende Namen, Daten und Nummern nicht erfinden; Aufgabe genau auslesen; guter HAK-Schueler-Stil.
 - summary: kurze Stichpunkte, wichtige Begriffe, keine unnoetigen Details.
 - explanation: einfache HAK-Erklaerung, mit Beispiel wenn sinnvoll.
-- calculation: Formel, Rechenweg, Ergebnis. short_answer ist das Endergebnis.
+- calculation: Formel, Rechenweg, Ergebnis. short_answer ist nur das finale Endergebnis, z.B. "2.152,14 €".
 - Mathe-MC/calculation: Antwortoptionen einzeln einsetzen und rechnerisch pruefen; nicht raten.
-- accounting: Buchungssatz/Kalkulation/BW-Loesung mit kurzer HAK-Erklaerung.
+- accounting: Buchungssatz/Kalkulation/BW-Loesung mit kurzer HAK-Erklaerung. Bei Buchungssaetzen ist short_answer der komplette Buchungssatz.
 - BW/RW: Kaufvertrag, Lieferung, Zahlung, Maengelruege, Mahnung, Verzug, Skonto, Rabatt, Kalkulation, Buchungssaetze, Soll/Haben, Umsatzsteuer und Zahlungsverkehr streng fachlich pruefen.
 - flashcards: sinnvolle Karteikarten in flashcards.
 - no_task/incomplete_task: ehrlich melden, keine erfundene Aufgabe.

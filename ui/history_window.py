@@ -46,7 +46,7 @@ class HistoryWindow:
 
         self.tree = ttk.Treeview(
             self.window,
-            columns=("date", "type", "subject", "short", "confidence", "provider", "cost"),
+            columns=("date", "type", "subject", "short", "copied", "confidence", "provider", "cost"),
             show="headings",
             height=12,
         )
@@ -54,13 +54,15 @@ class HistoryWindow:
         self.tree.heading("type", text="Typ")
         self.tree.heading("subject", text="Fach")
         self.tree.heading("short", text="Kurzantwort")
+        self.tree.heading("copied", text="Kopiert")
         self.tree.heading("confidence", text="Conf.")
         self.tree.heading("provider", text="Provider")
         self.tree.heading("cost", text="Kosten")
         self.tree.column("date", width=135, anchor="w")
         self.tree.column("type", width=120, anchor="w")
         self.tree.column("subject", width=110, anchor="w")
-        self.tree.column("short", width=235, anchor="w")
+        self.tree.column("short", width=180, anchor="w")
+        self.tree.column("copied", width=120, anchor="w")
         self.tree.column("confidence", width=60, anchor="center")
         self.tree.column("provider", width=70, anchor="w")
         self.tree.column("cost", width=70, anchor="e")
@@ -108,6 +110,7 @@ class HistoryWindow:
                         "",
                         "",
                         "",
+                        "",
                     ),
                 )
             return
@@ -124,6 +127,7 @@ class HistoryWindow:
                     result.task_type,
                     result.subject,
                     (result.short_answer or result.full_answer)[:90],
+                    result.copied_value[:80],
                     f"{result.confidence_percent}%",
                     result.provider,
                     f"${result.estimated_cost_usd:.4f}",
@@ -210,7 +214,10 @@ class HistoryWindow:
         if kind == "hist":
             result = self._selected_result()
             if result is not None:
-                self.preview.insert("end", result.full_answer or result.explanation or result.short_answer)
+                preview = result.full_answer or result.explanation or result.short_answer
+                if result.copied_value:
+                    preview = f"Kopiert: {result.copied_value}\n\n{preview}"
+                self.preview.insert("end", preview)
         else:
             for card in self.current_cards:
                 if int(card["id"]) == int(raw_id):

@@ -62,7 +62,7 @@ MODEL_PRICING_USD_PER_1M = {
     "gemini": {
         "gemini-3-pro-preview": {"input": 0.00, "output": 0.00},
         "gemini-3-flash-preview": {"input": 0.00, "output": 0.00},
-        "gemini-2.5-pro": {"input": 1.25, "output": 10.00},
+        "gemini-2.5-pro": {"input": 2.25, "output": 18.00},
         "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
         "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
         "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
@@ -82,8 +82,8 @@ MODEL_DESCRIPTIONS = {
     "gemini-2.5-pro": "Gemini: sehr gute Qualitaet, langsamer/teurer",
     "gemini-2.5-flash": "Gemini: schneller Alltag, guter Standard",
     "gemini-2.5-flash-lite": "Gemini: sehr schnell/guenstig, falls verfuegbar",
-    "gemini-2.0-flash": "Gemini: schnelle Fallback-Analyse",
-    "gemini-2.0-flash-lite": "Gemini: leichter schneller Fallback, falls verfuegbar",
+    "gemini-2.0-flash": "Gemini: schnelle Fallback-Analyse; laut Google ab 2026-06-01 abgeschaltet",
+    "gemini-2.0-flash-lite": "Gemini: leichter schneller Fallback; laut Google ab 2026-06-01 abgeschaltet",
 }
 
 TASK_TYPES = [

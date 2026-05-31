@@ -1,295 +1,158 @@
-"""Non-blocking screenshot area selector."""
+"""Nearly invisible Tkinter screenshot area selector."""
 
 from __future__ import annotations
 
-import ctypes
 import logging
-import time
 import tkinter as tk
 from collections.abc import Callable
-from ctypes import wintypes
+
+from utils.windows import get_screen_scale, hide_from_taskbar, keep_topmost
 
 MIN_SELECTION_SIZE = 10
-POLL_MS = 16
-DEFAULT_TIMEOUT_SECONDS = 20
+SELECTOR_ALPHA = 0.01
+FINISH_DELAY_MS = 150
 
 LOGGER = logging.getLogger(__name__)
 
-HC_ACTION = 0
-WH_MOUSE_LL = 14
-WM_MOUSEMOVE = 0x0200
-WM_LBUTTONDOWN = 0x0201
-WM_LBUTTONUP = 0x0202
-WM_RBUTTONDOWN = 0x0204
-WM_RBUTTONUP = 0x0205
-VK_ESCAPE = 0x1B
-KEYEVENTF_KEYUP = 0x0002
-
-HOOKPROC = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)(
-    wintypes.LPARAM,
-    ctypes.c_int,
-    wintypes.WPARAM,
-    wintypes.LPARAM,
-)
-ULONG_PTR = getattr(wintypes, "ULONG_PTR", wintypes.WPARAM)
-
-
-class _Point(ctypes.Structure):
-    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
-
-
-class _MSLLHOOKSTRUCT(ctypes.Structure):
-    _fields_ = [
-        ("pt", _Point),
-        ("mouseData", wintypes.DWORD),
-        ("flags", wintypes.DWORD),
-        ("time", wintypes.DWORD),
-        ("dwExtraInfo", ULONG_PTR),
-    ]
-
 
 class ScreenAreaSelector:
-    """Track a drag selection through non-blocking Windows input polling."""
+    """Old Moodler-style fullscreen selector using normal Tk events."""
 
     def __init__(
         self,
         master: tk.Tk,
         on_complete: Callable[[tuple[int, int, int, int] | None], None],
-        timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+        timeout_seconds: int | None = None,
     ) -> None:
         self.master = master
         self.on_complete = on_complete
-        self.timeout_seconds = max(3, int(timeout_seconds))
-        self.start_time = time.monotonic()
         self.start: tuple[int, int] | None = None
         self.final_coords: tuple[int, int, int, int] | None = None
         self.completed = False
-        self.finishing = False
-        self.dragging = False
-        self.after_id: str | None = None
-        self.mouse_hook = None
-        self.hook_proc = None
-        self.await_initial_release = self._left_down()
+        self.keep_topmost_after_id: str | None = None
+        self.timeout_seconds = timeout_seconds
 
         LOGGER.info("selector created")
-        self._install_mouse_hook()
-        self._schedule_poll()
+        self.window = tk.Toplevel(master)
+        self.window.withdraw()
+        self.window.attributes("-fullscreen", True)
+        self.window.configure(bg="black")
+        self.window.attributes("-topmost", True)
+        self.window.attributes("-alpha", SELECTOR_ALPHA)
+        self.window.overrideredirect(True)
+        self.window.update_idletasks()
+        hide_from_taskbar(self.window)
 
-    def _schedule_poll(self) -> None:
-        if self.completed or self.finishing:
-            return
+        self.canvas = tk.Canvas(self.window, highlightthickness=0, bg="black", bd=0)
+        self.canvas.pack(fill="both", expand=True)
+
+        self.window.deiconify()
+        self.window.lift()
+        self.window.focus_force()
+        self.canvas.focus_set()
+
         try:
-            self.after_id = self.master.after(POLL_MS, self._poll)
+            self.scale_factor = get_screen_scale(self.window.winfo_id())
         except Exception:
-            LOGGER.exception("selector poll could not be scheduled")
-            self._cancel("schedule error")
+            self.scale_factor = 1.0
 
-    def _poll(self) -> None:
-        if self.completed or self.finishing:
+        self.canvas.bind("<ButtonPress-1>", self._on_press)
+        self.canvas.bind("<B1-Motion>", self._on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        self.canvas.bind("<ButtonPress-3>", self._cancel)
+        self.canvas.bind("<ButtonRelease-3>", self._cancel)
+        self.window.bind("<Escape>", self._cancel)
+        self.canvas.bind("<Escape>", self._cancel)
+        self.window.bind("<KeyPress-Escape>", self._cancel)
+
+        self.master.after(10, lambda: hide_from_taskbar(self.window))
+        self._keep_on_top()
+
+    def _on_press(self, event: tk.Event) -> None:
+        if self.completed:
             return
-        try:
-            if time.monotonic() - self.start_time >= self.timeout_seconds:
-                LOGGER.info("selector timeout")
-                self._cancel("timeout")
-                return
+        self.start = (int(event.x_root), int(event.y_root))
+        LOGGER.info("mouse down %s,%s", self.start[0], self.start[1])
 
-            if self._escape_down():
-                self._cancel("escape")
-                return
+    def _on_drag(self, _event: tk.Event) -> None:
+        # Intentionally no drawing: no rectangle, no colored frame, no text.
+        return
 
-            if self._right_down():
-                self._cancel("right click")
-                return
-
-            if self.mouse_hook:
-                self._schedule_poll()
-                return
-
-            left_down = self._left_down()
-            pos = self._cursor_pos()
-
-            if self.await_initial_release:
-                if not left_down:
-                    self.await_initial_release = False
-                self._schedule_poll()
-                return
-
-            if not self.dragging:
-                if left_down:
-                    self.dragging = True
-                    self.start = pos
-                    LOGGER.info("mouse down %s,%s", pos[0], pos[1])
-                self._schedule_poll()
-                return
-
-            if left_down:
-                self._schedule_poll()
-                return
-
-            self._finish_at(pos)
-        except Exception:
-            LOGGER.exception("selector error")
-            self._cancel("error")
-
-    def _finish_at(self, pos: tuple[int, int]) -> None:
-        LOGGER.info("mouse up %s,%s", pos[0], pos[1])
+    def _on_release(self, event: tk.Event) -> None:
+        if self.completed:
+            return
         if self.start is None:
-            self._cancel("missing start")
+            self._cancel()
             return
+
         x1, y1 = self.start
-        x2, y2 = pos
+        x2, y2 = int(event.x_root), int(event.y_root)
+        LOGGER.info("mouse up %s,%s", x2, y2)
+
         if abs(x2 - x1) < MIN_SELECTION_SIZE or abs(y2 - y1) < MIN_SELECTION_SIZE:
-            self._cancel("selection too small")
+            self._cancel()
             return
-        self.final_coords = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+
+        scale = float(self.scale_factor or 1.0)
+        self.final_coords = (
+            int(round(min(x1, x2) * scale)),
+            int(round(min(y1, y2) * scale)),
+            int(round(max(x1, x2) * scale)),
+            int(round(max(y1, y2) * scale)),
+        )
         LOGGER.info("bbox selected %s", self.final_coords)
-        coords = self.final_coords
         self.completed = True
+        self._hide_before_finish()
+        self.master.after(FINISH_DELAY_MS, self._complete)
+
+    def _complete(self) -> None:
+        coords = self.final_coords
         self._destroy()
-        self._complete(coords)
+        self._safe_callback(coords)
 
-    def _mouse_hook_callback(self, n_code: int, w_param, l_param) -> int:
-        try:
-            if n_code == HC_ACTION and not self.completed:
-                msg = int(w_param)
-                info = ctypes.cast(l_param, ctypes.POINTER(_MSLLHOOKSTRUCT)).contents
-                pos = (int(info.pt.x), int(info.pt.y))
-                if msg == WM_LBUTTONDOWN and not self.await_initial_release:
-                    self.dragging = True
-                    self.start = pos
-                    LOGGER.info("mouse down %s,%s", pos[0], pos[1])
-                    return 1
-                if msg == WM_MOUSEMOVE and self.dragging:
-                    return 1
-                if msg == WM_LBUTTONUP:
-                    if self.await_initial_release:
-                        self.await_initial_release = False
-                        return self._call_next_hook(n_code, w_param, l_param)
-                    if self.dragging:
-                        self._defer_finish(pos)
-                        return 1
-                if msg in {WM_RBUTTONDOWN, WM_RBUTTONUP}:
-                    self._defer_cancel("right click")
-                    return 1
-        except Exception:
-            LOGGER.exception("selector mouse hook error")
-            self._defer_cancel("hook error")
-            return 1
-        return self._call_next_hook(n_code, w_param, l_param)
-
-    def _defer_finish(self, pos: tuple[int, int]) -> None:
-        if self.completed or self.finishing:
-            return
-        self.finishing = True
-        try:
-            self.master.after(0, lambda: self._finish_at(pos))
-        except Exception:
-            LOGGER.exception("selector finish could not be deferred")
-            self._cancel("defer finish error")
-
-    def _defer_cancel(self, reason: str) -> None:
-        if self.completed or self.finishing:
-            return
-        self.finishing = True
-        try:
-            self.master.after(0, lambda: self._cancel(reason))
-        except Exception:
-            LOGGER.exception("selector cancel could not be deferred")
-            self._cancel(reason)
-
-    def _install_mouse_hook(self) -> None:
-        try:
-            user32 = ctypes.windll.user32
-            kernel32 = ctypes.windll.kernel32
-            user32.SetWindowsHookExW.argtypes = [ctypes.c_int, HOOKPROC, wintypes.HINSTANCE, wintypes.DWORD]
-            user32.SetWindowsHookExW.restype = wintypes.HANDLE
-            user32.CallNextHookEx.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.WPARAM, wintypes.LPARAM]
-            user32.CallNextHookEx.restype = wintypes.LPARAM
-            user32.UnhookWindowsHookEx.argtypes = [wintypes.HANDLE]
-            user32.UnhookWindowsHookEx.restype = wintypes.BOOL
-            kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
-            kernel32.GetModuleHandleW.restype = wintypes.HMODULE
-            self.hook_proc = HOOKPROC(self._mouse_hook_callback)
-            module_handle = kernel32.GetModuleHandleW(None)
-            self.mouse_hook = user32.SetWindowsHookExW(WH_MOUSE_LL, self.hook_proc, module_handle, 0)
-            if self.mouse_hook:
-                LOGGER.info("selector mouse hook installed")
-            else:
-                self.mouse_hook = None
-                LOGGER.warning("selector mouse hook unavailable, falling back to passive polling")
-        except Exception:
-            self.mouse_hook = None
-            self.hook_proc = None
-            LOGGER.warning("selector mouse hook install failed, falling back to passive polling", exc_info=True)
-
-    def _uninstall_mouse_hook(self) -> None:
-        if not self.mouse_hook:
-            return
-        try:
-            ctypes.windll.user32.UnhookWindowsHookEx(self.mouse_hook)
-            LOGGER.info("selector mouse hook removed")
-        except Exception:
-            LOGGER.debug("selector mouse hook removal failed", exc_info=True)
-        finally:
-            self.mouse_hook = None
-            self.hook_proc = None
-
-    def _call_next_hook(self, n_code: int, w_param, l_param) -> int:
-        try:
-            return int(ctypes.windll.user32.CallNextHookEx(self.mouse_hook, n_code, w_param, l_param))
-        except Exception:
-            return 0
-
-    def _complete(self, coords: tuple[int, int, int, int] | None) -> None:
-        try:
-            self.master.after(0, lambda: self.on_complete(coords))
-        except Exception:
-            LOGGER.exception("selector callback failed")
-
-    def _cancel(self, reason: str = "cancelled") -> None:
+    def _cancel(self, _event: tk.Event | None = None) -> None:
         if self.completed:
             return
         self.completed = True
-        LOGGER.info("selector cancelled: %s", reason)
+        self.final_coords = None
+        LOGGER.info("selector cancelled")
         self._destroy()
-        self._complete(None)
+        self._safe_callback(None)
+
+    def _hide_before_finish(self) -> None:
+        try:
+            self.window.withdraw()
+            self.window.update_idletasks()
+        except Exception:
+            LOGGER.debug("selector withdraw before finish failed", exc_info=True)
 
     def _destroy(self) -> None:
-        self._uninstall_mouse_hook()
-        if self.after_id is not None:
+        if self.keep_topmost_after_id is not None:
             try:
-                self.master.after_cancel(self.after_id)
+                self.window.after_cancel(self.keep_topmost_after_id)
             except Exception:
                 pass
-            self.after_id = None
-        self._clear_text_selection()
+            self.keep_topmost_after_id = None
+        try:
+            if self.window.winfo_exists():
+                self.window.destroy()
+        except Exception:
+            LOGGER.debug("selector destroy failed", exc_info=True)
         LOGGER.info("selector destroyed")
 
-    @staticmethod
-    def _cursor_pos() -> tuple[int, int]:
-        point = _Point()
-        if not ctypes.windll.user32.GetCursorPos(ctypes.byref(point)):
-            raise RuntimeError("Cursorposition konnte nicht gelesen werden.")
-        return int(point.x), int(point.y)
-
-    @staticmethod
-    def _key_down(vk_code: int) -> bool:
-        return bool(ctypes.windll.user32.GetAsyncKeyState(vk_code) & 0x8000)
-
-    def _left_down(self) -> bool:
-        return self._key_down(0x01)
-
-    def _right_down(self) -> bool:
-        return self._key_down(0x02)
-
-    def _escape_down(self) -> bool:
-        return self._key_down(0x1B)
-
-    @staticmethod
-    def _clear_text_selection() -> None:
+    def _safe_callback(self, coords: tuple[int, int, int, int] | None) -> None:
         try:
-            user32 = ctypes.windll.user32
-            user32.keybd_event(VK_ESCAPE, 0, 0, 0)
-            user32.keybd_event(VK_ESCAPE, 0, KEYEVENTF_KEYUP, 0)
+            self.on_complete(coords)
         except Exception:
-            LOGGER.debug("text selection cleanup failed", exc_info=True)
+            LOGGER.exception("selector callback failed")
+
+    def _keep_on_top(self) -> None:
+        if self.completed:
+            return
+        try:
+            if not self.window.winfo_exists():
+                return
+            keep_topmost(self.window)
+            self.keep_topmost_after_id = self.window.after(50, self._keep_on_top)
+        except Exception:
+            LOGGER.debug("selector keep-on-top failed", exc_info=True)

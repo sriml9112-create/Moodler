@@ -46,25 +46,25 @@
 - UI updates return through `root.after(...)`.
 - OpenAI client uses configured timeout.
 - Long answers are copied silently when Auto-Copy is active.
+- Calculation/accounting results store `copied_value`; calculation copies the final value, accounting copies the booking entry when detected.
 - Task warnings are saved in result/history/details instead of interrupting the flow.
 - Token and cost metadata is stored per history row; dashboard totals are local estimates.
 - Live provider balance is not claimed because neither desktop provider API exposes a simple universal balance endpoint here.
 
 ## Screenshot Selector
 
-- [x] No dark fullscreen dimming overlay.
+- [x] Uses the old stable Moodler principle: fullscreen `tk.Toplevel`, `alpha=0.01`, black background, `Canvas`.
+- [x] Uses normal Tk bindings: `<ButtonPress-1>`, `<B1-Motion>`, `<ButtonRelease-1>`, `<Escape>`.
+- [x] No low-level Windows mouse hook.
+- [x] No input polling loop.
+- [x] No `grab_set`, `wait_window`, or `wait_variable`.
 - [x] No green selection rectangle.
-- [x] No fullscreen invisible input-capturing Toplevel.
-- [x] No selection frame, border, overlay, text, or visible marker.
-- [x] No global grabs or blocking waits.
-- [x] Mouse and Esc/Right-click are polled through `root.after(...)`.
-- [x] A low-level Windows mouse hook blocks the drag from reaching browsers/desktops, preventing blue text selection during capture.
-- [x] Hook callbacks defer finish/cancel work back into Tk via `root.after(...)` to avoid destroying hook state inside the hook callback.
-- [x] The hook is uninstalled on selection, Esc, right-click, timeout, and errors.
-- [x] Escape is sent after cleanup to clear any accidental text selection.
-- [x] No selector windows are created during area selection.
-- [x] `Esc`, right-click, timeout, and small selections cancel and return the toolbar to `Ready`.
-- [x] Selector timeout defaults to 20 seconds.
+- [x] No drawn selection frame, border, text, or marker.
+- [x] The nearly transparent Canvas catches drag events, preventing browser text selection.
+- [x] Coordinates are calculated from `event.x_root`/`event.y_root` and converted with current DPI scale.
+- [x] On release the selector calls `withdraw()`, waits 150 ms, destroys itself, then hands coords back.
+- [x] Screenshot capture still runs afterward in a worker thread.
+- [x] `Esc`, right-click, and small selections cancel and return the toolbar to `Ready`.
 
 ## Prompt Notes
 
@@ -72,12 +72,15 @@
 - Hidden preferred subjects are forced to the BW/HAK default list.
 - Prompt always includes: HAK-Schueler, BW/RW, Kaufvertrag, Zahlungsverkehr, Mahnwesen, Kalkulation.
 - OpenAI and Gemini use the same task JSON schema and the same HAK/BW context.
+- OpenAI and Gemini use the same prompt builder; letter/email extraction rules are not duplicated per provider.
 - Human writing style is required for letters, emails, summaries, explanations, translations, and generic texts.
+- Letter/email prompts require reading recipient, contact person, subject, numbers, dates, deadlines, product, quantity, defect/reason and requested action without inventing missing data.
 - Provider modes are `openai`, `gemini`, `auto`, and `compare`.
 - Auto mode falls back silently to the other configured provider and stores the notice in warnings/details.
 - Compare mode asks both providers where keys are available and verifies fachlich, not by majority.
 - Mathe-MC judge instructions require calculation/einsetzen instead of majority voting.
 - BW/RW judge instructions require fachliche/logische Pruefung before comparing agents.
 - Agent/Judge fallback marks divergent answers as `unsicher` instead of choosing a majority.
+- Uncertainty retry runs at most three analysis attempts; after that unresolved tasks stay `unsicher`.
 - Model fallback order is `gpt-4.1 -> gpt-4o -> gpt-4o-mini`.
 - Gemini model fallback order is `gemini-2.5-flash -> gemini-2.0-flash`.

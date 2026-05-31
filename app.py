@@ -57,6 +57,7 @@ class MoodlerApp:
         self.current_source = "unknown"
         self.current_result: TaskResult | None = None
         self.control_center: ControlCenter | None = None
+        self.active_selector: ScreenAreaSelector | None = None
         self.busy = False
         self.last_copy_status = "-"
         self.ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
@@ -92,7 +93,7 @@ class MoodlerApp:
             return
         self._set_busy(True, "Bereich waehlen...")
         try:
-            ScreenAreaSelector(self.toolbar.root, self._on_selection_complete)
+            self.active_selector = ScreenAreaSelector(self.toolbar.root, self._on_selection_complete)
         except Exception as exc:
             LOGGER.exception("Screenshot selector failed")
             self._set_busy(False, "Error")
@@ -101,6 +102,7 @@ class MoodlerApp:
                 self.open_details()
 
     def _on_selection_complete(self, coords: tuple[int, int, int, int] | None) -> None:
+        self.active_selector = None
         if coords is None:
             self._set_busy(False, "Ready")
             return
@@ -254,14 +256,16 @@ class MoodlerApp:
     def _handle_result(self, result: TaskResult) -> None:
         self.current_result = result
         copy_failed = False
-        if self.formatter.should_copy_full_answer(result, self.settings):
-            copy_failed = not self.clipboard.copy(self.formatter.clipboard_text(result))
+        copy_text = self.formatter.auto_copy_text(result, self.settings)
+        result.copied_value = copy_text
+        if copy_text:
+            copy_failed = not self.clipboard.copy(copy_text)
             if copy_failed:
                 result.warnings.append("Antwort konnte nicht automatisch in die Zwischenablage kopiert werden.")
                 self.last_copy_status = "Fehler"
             else:
                 self.last_copy_status = "kopiert"
-        elif result.task_type in self.formatter.COPY_TYPES:
+        elif result.task_type in self.formatter.COPY_TYPES or result.task_type in self.formatter.VALUE_COPY_TYPES:
             self.last_copy_status = "aus"
         else:
             self.last_copy_status = "-"
@@ -349,7 +353,7 @@ class MoodlerApp:
         self.copy_result(self.current_result)
 
     def copy_result(self, result: TaskResult) -> None:
-        text = result.full_answer or result.short_answer or result.explanation
+        text = self.formatter.clipboard_text(result)
         if self.clipboard.copy(text):
             self.toolbar.set_status("Kopiert")
         else:
@@ -374,6 +378,7 @@ class MoodlerApp:
             "last_confidence": f"{self.current_result.confidence_percent}%" if self.current_result else "-",
             "last_answer_type": self.current_result.task_type if self.current_result else "-",
             "last_answer_text": self.formatter.clipboard_text(self.current_result) if self.current_result else "",
+            "last_copied_value": self.current_result.copied_value if self.current_result else "",
             "last_cost": f"${self.current_result.estimated_cost_usd:.4f}" if self.current_result else "-",
             "copy_status": self.last_copy_status,
             "auto_detect": self.settings.auto_detect_tasks,

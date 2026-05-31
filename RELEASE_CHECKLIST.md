@@ -6,6 +6,9 @@ Vor GitHub-Release:
 - [ ] Keine lokalen Datenbanken, Logs, `build`, `dist`, `.venv` oder `__pycache__` committen.
 - [ ] `python -m compileall .` erfolgreich.
 - [ ] `MOODLER_SMOKE_TEST=1 python main.py` erfolgreich.
+- [ ] Auto-Copy geprüft: Rechenergebnis, Buchungssatz, Brief/E-Mail.
+- [ ] Verlauf zeigt Provider, Modell, Tokens, Kosten, Fallback und kopierten Wert.
+- [ ] Unsicherheits-Retry geprüft: maximal 3 Versuche, danach `unsicher`.
 - [ ] `build_portable.bat` ausführen.
 - [ ] `dist\Moodler-portable.zip` prüfen.
 - [ ] ZIP enthält `Moodler.exe`, `README.md`, `.env.example`.

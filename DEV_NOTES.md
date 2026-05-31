@@ -50,6 +50,7 @@
 - Task warnings are saved in result/history/details instead of interrupting the flow.
 - Token and cost metadata is stored per history row; dashboard totals are local estimates.
 - Live provider balance is not claimed because neither desktop provider API exposes a simple universal balance endpoint here.
+- SEB support is detection-only: Moodler checks running process names for status display, but does not bypass, hide from, alter, or weaken Safe Exam Browser restrictions.
 
 ## Screenshot Selector
 

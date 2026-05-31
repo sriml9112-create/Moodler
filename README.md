@@ -82,6 +82,13 @@ Das Zahnrad öffnet genau acht Bereiche:
 
 Dashboard zeigt API-Status, Provider, Modell, Agenten, letzte Aufgabe, Copy-Status, letzte Kosten, Gesamtkosten und Restbudget. Live-Balance vom Anbieter wird nicht behauptet; Kosten sind lokal geschätzt.
 Zusätzlich siehst du den zuletzt kopierten Wert, z. B. ein Rechenergebnis oder einen Buchungssatz.
+Dashboard und Systemcheck zeigen außerdem `SEB erkannt: Ja/Nein`.
+
+## SEB-Kompatibilität
+
+Moodler darf in Safe Exam Browser nur genutzt werden, wenn Schule, Lehrperson oder Prüfungsleitung es ausdrücklich erlauben und die SEB-Konfiguration Moodler als erlaubte Anwendung zulässt.
+
+Moodler versucht nicht, SEB zu umgehen, sich vor SEB zu verstecken oder SEB-Regeln zu verändern. Die SEB-Funktion erkennt nur, ob ein SEB-Prozess läuft, und zeigt diesen Status im Control Center an.
 
 ## Kosten und Budget
 

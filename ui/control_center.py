@@ -100,6 +100,7 @@ class ControlCenter:
             [
                 "Anbieter",
                 "API-Key",
+                "SEB erkannt",
                 "Modell",
                 "Agenten",
                 "Letzter Task",
@@ -400,6 +401,7 @@ class ControlCenter:
         values = {
             "Anbieter": str(state.get("provider", "openai")),
             "API-Key": "vorhanden" if state.get("api_key_ok") else "fehlt",
+            "SEB erkannt": str(state.get("seb_detected", "unbekannt")),
             "Modell": str(state.get("model", "-")),
             "Agenten": str(state.get("agent_count", "-")),
             "Letzter Task": str(state.get("last_task", "-")),
@@ -574,6 +576,16 @@ class ControlCenter:
         rows.append(self._package_row("pyperclip", "pyperclip", "pip install pyperclip"))
         rows.append(("OK" if self.settings.openai_api_key else "WARNUNG", "OpenAI-Key", "vorhanden" if self.settings.openai_api_key else "fehlt", "API Tab"))
         rows.append(("OK" if self.settings.gemini_api_key else "WARNUNG", "Gemini-Key", "vorhanden" if self.settings.gemini_api_key else "fehlt", "API Tab"))
+        state = self.get_overview_state()
+        seb_label = str(state.get("seb_detected", "unbekannt"))
+        seb_details = str(state.get("seb_details", ""))
+        seb_status = "WARNUNG" if seb_label == "Ja" else "OK" if seb_label == "Nein" else "WARNUNG"
+        rows.append((
+            seb_status,
+            "SEB",
+            f"erkannt: {seb_label}; {seb_details}",
+            "Nur nutzen, wenn Schule und SEB-Konfiguration Moodler erlauben.",
+        ))
         rows.append(("OK" if (PROJECT_ROOT / ".env").exists() else "WARNUNG", ".env", str((PROJECT_ROOT / ".env").exists()), ".env.example kopieren"))
         rows.append(("OK" if CONFIG_PATH.parent.exists() else "WARNUNG", "Config", str(CONFIG_PATH), "AppData prüfen"))
         try:

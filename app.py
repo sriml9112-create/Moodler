@@ -18,6 +18,7 @@ from services.clipboard_service import ClipboardService
 from services.config_service import ConfigService
 from services.history_service import HistoryService
 from services.result_formatter import ResultFormatter
+from services.seb_service import SEBService
 from services.screenshot_service import ScreenshotService
 from services.task_detector import TaskDetector
 from ui.control_center import ControlCenter
@@ -48,6 +49,7 @@ class MoodlerApp:
         self.agent_service = AgentService(self.ai_router)
         self.formatter = ResultFormatter()
         self.screenshot_service = ScreenshotService()
+        self.seb_service = SEBService()
         self.clipboard = ClipboardService()
 
         self.current_mode = "auto"
@@ -364,6 +366,7 @@ class MoodlerApp:
         self.toolbar.set_status("Kopiert")
 
     def _overview_state(self) -> dict[str, object]:
+        seb_status = self.seb_service.status()
         return {
             "mode": self.settings.default_mode,
             "provider": self.settings.ai_provider,
@@ -384,6 +387,8 @@ class MoodlerApp:
             "auto_detect": self.settings.auto_detect_tasks,
             "auto_copy": self.settings.auto_copy_long_results,
             "bw_focus": self.settings.bw_focus_enabled,
+            "seb_detected": seb_status.label,
+            "seb_details": seb_status.details,
         }
 
     def save_cards(self, result: TaskResult) -> None:
